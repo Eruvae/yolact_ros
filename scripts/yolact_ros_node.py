@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-from __future__ import print_function
-
 import roslib
 roslib.load_manifest('yolact_ros')
 import sys
 import rospy
 import cv2
 from std_msgs.msg import String
+from std_msgs.msg import Header
 from sensor_msgs.msg import Image
 from yolact_ros.msg import Detections
 from yolact_ros.msg import Detection
@@ -38,6 +37,7 @@ class image_converter:
 
   def __init__(self, net:Yolact):
     self.net = net
+
     self.image_pub = rospy.Publisher("cvimage_published",Image,queue_size=10)
 
     self.detections_pub = rospy.Publisher("detections",numpy_msg(Detections),queue_size=10)
@@ -45,7 +45,7 @@ class image_converter:
     self.bridge = CvBridge()
     self.image_sub = rospy.Subscriber("/sensorring_cam3d/rgb/image_raw",Image,self.callback)
 
-  def prep_display(self, dets_out, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45):
+  def prep_display(self, dets_out, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, image_header=Header()):
     with torch.no_grad():
         """
         Note: If undo_transform=False then im_h and im_w are allowed to be None.
@@ -157,28 +157,30 @@ class image_converter:
             det.class_name = _class
             det.score = score
             mask_shape = np.shape(masks[j])
-            print("Num dets: ",  num_dets_to_consider)
-            print("Shape: ", mask_shape)
+            #print("Num dets: ",  num_dets_to_consider)
+            #print("Shape: ", mask_shape)
             mask_bb = np.squeeze(masks[j].cpu().numpy(), axis=2)[y1:y2+1,x1:x2+1]
-            print("Box: ", x1,",",x2,",",y1,",",y2)
-            print("Mask in box shape: ", np.shape(mask_bb))
+            #print("Box: ", x1,",",x2,",",y1,",",y2)
+            #print("Mask in box shape: ", np.shape(mask_bb))
             mask_rs = np.reshape(mask_bb, -1)
-            print("New shape: ", np.shape(mask_rs))
-            print("Mask:\n",mask_bb)
+            #print("New shape: ", np.shape(mask_rs))
+            #print("Mask:\n",mask_bb)
             det.mask.height = y2 - y1 + 1
             det.mask.width = x2 - x1 + 1
             det.mask.mask = np.array(mask_rs, dtype=bool)
             dets.detections.append(det)
  
+        dets.header.stamp = image_header.stamp
+        dets.header.frame_id = image_header.frame_id
         self.detections_pub.publish(dets)
     return img_numpy
 
-  def evalimage(self, cv_image):
+  def evalimage(self, cv_image, image_header):
     frame = torch.from_numpy(cv_image).cuda().float()
     batch = FastBaseTransform()(frame.unsqueeze(0))
     preds = self.net(batch)
 
-    img_numpy = self.prep_display(preds, frame, None, None, undo_transform=False)
+    img_numpy = self.prep_display(preds, frame, None, None, undo_transform=False, image_header=image_header)
     
     #if save_path is None:
     #    img_numpy = img_numpy[:, :, (2, 1, 0)]
@@ -192,7 +194,7 @@ class image_converter:
     except CvBridgeError as e:
       print(e)
 
-    self.evalimage(cv_image)
+    self.evalimage(cv_image, data.header)
 
     try:
       self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, "bgr8"))
