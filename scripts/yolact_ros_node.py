@@ -7,10 +7,10 @@ import cv2
 from std_msgs.msg import String
 from std_msgs.msg import Header
 from sensor_msgs.msg import Image
-from yolact_ros.msg import Detections
-from yolact_ros.msg import Detection
-from yolact_ros.msg import Box
-from yolact_ros.msg import Mask
+from yolact_ros_msgs.msg import Detections
+from yolact_ros_msgs.msg import Detection
+from yolact_ros_msgs.msg import Box
+from yolact_ros_msgs.msg import Mask
 from cv_bridge import CvBridge, CvBridgeError
 
 import numpy as np

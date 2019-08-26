@@ -8,7 +8,7 @@ project(yolact_ros)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  sensor_msgs cv_bridge rospy std_msgs message_generation
+  sensor_msgs cv_bridge rospy std_msgs yolact_ros_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -50,13 +50,6 @@ find_package(catkin REQUIRED COMPONENTS
 #   Message1.msg
 #   Message2.msg
 # )
-add_message_files(
-  FILES
-  Box.msg
-  Mask.msg
-  Detection.msg
-  Detections.msg
-)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -77,9 +70,6 @@ add_message_files(
 #   DEPENDENCIES
 #   std_msgs  # Or other packages containing msgs
 # )
-generate_messages(
-  DEPENDENCIES std_msgs
-)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -113,7 +103,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES yolact_ros
-   CATKIN_DEPENDS sensor_msgs cv_bridge rospy std_msgs message_runtime
+   CATKIN_DEPENDS sensor_msgs cv_bridge rospy std_msgs yolact_ros_msgs
 #  DEPENDS system_lib
 )
 
