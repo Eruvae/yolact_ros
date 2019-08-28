@@ -43,7 +43,8 @@ class image_converter:
     self.detections_pub = rospy.Publisher("detections",numpy_msg(Detections),queue_size=10)
 
     self.bridge = CvBridge()
-    self.image_sub = rospy.Subscriber("/sensorring_cam3d/rgb/image_raw",Image,self.callback)
+    #self.image_sub = rospy.Subscriber("/sensorring_cam3d/rgb/image_raw",Image,self.callback)
+    self.image_sub = rospy.Subscriber("/camera/rgb/image_raw",Image,self.callback)
 
   def prep_display(self, dets_out, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, image_header=Header()):
     with torch.no_grad():
@@ -159,14 +160,14 @@ class image_converter:
             mask_shape = np.shape(masks[j])
             #print("Num dets: ",  num_dets_to_consider)
             #print("Shape: ", mask_shape)
-            mask_bb = np.squeeze(masks[j].cpu().numpy(), axis=2)[y1:y2+1,x1:x2+1]
+            mask_bb = np.squeeze(masks[j].cpu().numpy(), axis=2)[y1:y2,x1:x2]
             #print("Box: ", x1,",",x2,",",y1,",",y2)
             #print("Mask in box shape: ", np.shape(mask_bb))
             mask_rs = np.reshape(mask_bb, -1)
             #print("New shape: ", np.shape(mask_rs))
             #print("Mask:\n",mask_bb)
-            det.mask.height = y2 - y1 + 1
-            det.mask.width = x2 - x1 + 1
+            det.mask.height = y2 - y1
+            det.mask.width = x2 - x1
             det.mask.mask = np.array(mask_rs, dtype=bool)
             dets.detections.append(det)
  
