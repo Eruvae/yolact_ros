@@ -3,10 +3,12 @@ import roslib
 roslib.load_manifest('yolact_ros')
 import sys
 import rospy
+import rospkg
 import cv2
 from std_msgs.msg import String
 from std_msgs.msg import Header
 from sensor_msgs.msg import Image
+from sensor_msgs.msg import CompressedImage
 from yolact_ros_msgs.msg import Detections
 from yolact_ros_msgs.msg import Detection
 from yolact_ros_msgs.msg import Box
@@ -43,8 +45,12 @@ class image_converter:
     self.detections_pub = rospy.Publisher("detections",numpy_msg(Detections),queue_size=10)
 
     self.bridge = CvBridge()
-    #self.image_sub = rospy.Subscriber("/sensorring_cam3d/rgb/image_raw",Image,self.callback)
-    self.image_sub = rospy.Subscriber("/camera/rgb/image_raw",Image,self.callback)
+    self.image_sub = rospy.Subscriber("/sensorring_cam3d/rgb/image_raw",Image,self.callback)
+    #self.image_sub = rospy.Subscriber("/sensorring_cam3d/rgb/image_raw/compressed",CompressedImage,self.callback)
+    #self.image_sub = rospy.Subscriber("/camera/rgb/image_raw",Image,self.callback)
+
+    #cv2.namedWindow("Image window")
+    #cv2.startWindowThread()
 
   def prep_display(self, dets_out, img, h, w, undo_transform=True, class_color=False, mask_alpha=0.45, image_header=Header()):
     with torch.no_grad():
@@ -186,8 +192,13 @@ class image_converter:
     #if save_path is None:
     #    img_numpy = img_numpy[:, :, (2, 1, 0)]
 
-    cv2.imshow("Image window", img_numpy)
-    cv2.waitKey(3)
+    #cv2.imshow("Image window", img_numpy)
+    #cv2.waitKey(1)
+
+    try:
+      self.image_pub.publish(self.bridge.cv2_to_imgmsg(img_numpy, "bgr8"))
+    except CvBridgeError as e:
+      print(e)
 
   def callback(self, data):
     try:
@@ -197,19 +208,19 @@ class image_converter:
 
     self.evalimage(cv_image, data.header)
 
-    try:
-      self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, "bgr8"))
-    except CvBridgeError as e:
-      print(e)
-
 def main(args):
+
+  rospack = rospkg.RosPack()
+  yolact_path = rospack.get_path('yolact_ros')
   
-  model_path = SavePath.from_str("weights/yolact_base_54_800000.pth")
+  model_path_str = yolact_path + "/scripts/weights/yolact_base_54_800000.pth"
+  model_path = SavePath.from_str(model_path_str)
   set_cfg(model_path.model_name + '_config')
 
   with torch.no_grad():
-      if not os.path.exists('results'):
-          os.makedirs('results')
+      results_path_str = yolact_path + "/scripts/results"
+      if not os.path.exists(results_path_str):
+          os.makedirs(results_path_str)
 
       cudnn.benchmark = True
       cudnn.fastest = True
@@ -217,7 +228,7 @@ def main(args):
 
       print('Loading model...', end='')
       net = Yolact()
-      net.load_weights("weights/yolact_base_54_800000.pth")
+      net.load_weights(model_path_str)
       net.eval()
       print(' Done.')
 
