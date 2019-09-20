@@ -45,7 +45,11 @@ class image_converter:
     self.detections_pub = rospy.Publisher("detections",numpy_msg(Detections),queue_size=10)
 
     self.bridge = CvBridge()
-    self.image_sub = rospy.Subscriber("/sensorring_cam3d/rgb/image_raw",Image,self.callback)
+
+    image_topic = rospy.get_param('~image_topic', '/camera/rgb/image_raw')
+    print("Subscribed to " + image_topic)
+    self.image_sub = rospy.Subscriber(image_topic,Image,self.callback)
+    #self.image_sub = rospy.Subscriber("/sensorring_cam3d/rgb/image_raw",Image,self.callback)
     #self.image_sub = rospy.Subscriber("/sensorring_cam3d/rgb/image_raw/compressed",CompressedImage,self.callback)
     #self.image_sub = rospy.Subscriber("/camera/rgb/image_raw",Image,self.callback)
 
@@ -210,6 +214,7 @@ class image_converter:
 
 def main(args):
 
+  rospy.init_node('yolact_ros')
   rospack = rospkg.RosPack()
   yolact_path = rospack.get_path('yolact_ros')
   
@@ -236,9 +241,8 @@ def main(args):
       net.detect.use_fast_nms = True
       cfg.mask_proto_debug = False
 
-
   ic = image_converter(net)
-  rospy.init_node('image_converter', anonymous=True)
+  
 
   try:
     rospy.spin()
