@@ -2,6 +2,8 @@
 import roslib
 roslib.load_manifest('yolact_ros')
 import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), "yolact"))
 import rospy
 import rospkg
 import cv2
@@ -19,7 +21,6 @@ import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
-import os
 from yolact import Yolact
 from utils.augmentations import BaseTransform, FastBaseTransform, Resize
 from layers.output_utils import postprocess, undo_image_transformation
@@ -218,12 +219,12 @@ def main(args):
   rospack = rospkg.RosPack()
   yolact_path = rospack.get_path('yolact_ros')
   
-  model_path_str = yolact_path + "/scripts/weights/yolact_base_54_800000.pth"
+  model_path_str = yolact_path + "/scripts/yolact/weights/yolact_base_54_800000.pth"
   model_path = SavePath.from_str(model_path_str)
   set_cfg(model_path.model_name + '_config')
 
   with torch.no_grad():
-      results_path_str = yolact_path + "/scripts/results"
+      results_path_str = yolact_path + "/scripts/yolact/results"
       if not os.path.exists(results_path_str):
           os.makedirs(results_path_str)
 
