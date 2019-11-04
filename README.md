@@ -1,8 +1,12 @@
 # yolact_ros
 
-ROS wrapper for Yolact
+ROS wrapper for Yolact.
 
-# Installation
+## Related packages
+
+[yolact_ros_msgs](https://github.com/Eruvae/yolact_ros_msgs): Provides messages for publishing the detection results.
+
+## Installation
 
 Yolact uses Python 3. If you use a ROS version built with Python 2, additional steps are necessary to run the node.
 
