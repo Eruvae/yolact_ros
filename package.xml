@@ -55,6 +55,7 @@
   <depend>rospy</depend>
   <depend>std_msgs</depend>
   <depend>yolact_ros_msgs</depend>
+  <depend>dynamic_reconfigure</depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
