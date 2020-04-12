@@ -58,6 +58,8 @@ class YolactNode:
 
     # set parameter default values (will be overwritten by dynamic reconfigure callback)
 
+    self.image_topic = ''
+    self.use_compressed_image = False
     self.publish_visualization = True
     self.publish_detections = True
     self.display_visualization = False
@@ -73,6 +75,11 @@ class YolactNode:
     self.top_k = 5
 
     self.image_sub = None # subscriber is created in dynamic_reconfigure callback
+
+    # for counting fps
+    self.fps = 0
+    self.last_reset_time = rospy.Time()
+    self.frame_counter = 0
 
   def visualizationLoop(self):
       print('Creating cv2 window')
@@ -95,6 +102,11 @@ class YolactNode:
         image = self.image_vis_queue.get_nowait()
         cv2.imshow(window_name, image)
         cv2.waitKey(30)
+
+  """
+  The functions process_results and prep_display are slightly modified versions
+  of the prep_display function in yolact's eval.py; Copyright (c) 2019 Daniel Bolya
+  """
 
   def postprocess_results(self, dets_out, w, h):
       with timer.env('Postprocess'):
@@ -250,8 +262,16 @@ class YolactNode:
       h, w, _ = frame.shape
       classes, scores, boxes, masks = self.postprocess_results(preds, w, h)
 
+      if self.display_fps:
+        now = rospy.get_rostime()
+        if now - self.last_reset_time > rospy.Duration(1): # reset timer / counter every second
+          self.fps = self.frame_counter
+          self.last_reset_time = now
+          self.frame_counter = 0
+        self.frame_counter += 1
+
       if self.publish_visualization or self.display_visualization:
-        image = self.prep_display(classes, scores, boxes, masks, frame)
+        image = self.prep_display(classes, scores, boxes, masks, frame, fps_str=str(self.fps))
 
       if self.publish_detections:
         dets = self.generate_detections_msg(classes, scores, boxes, masks, image_header)
@@ -268,21 +288,32 @@ class YolactNode:
 
   def callback(self, data):
     try:
-      cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+      if self.use_compressed_image:
+          np_arr = np.fromstring(data.data, np.uint8)
+          cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+      else:
+          cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+
     except CvBridgeError as e:
       print(e)
 
     self.evalimage(cv_image, data.header)
 
   def reconfigure_callback(self, config, level):
-    if level & (1 << 0): # image_topic
+    if level & ((1 << 0) | (1 << 1)): # image_topic / use_compressed_image
         if self.image_sub is not None:
           self.image_sub.unregister()
 
-        self.image_sub = rospy.Subscriber(config.image_topic, Image, self.callback, queue_size=1)
-        print('Subscribed to ' + config.image_topic)
-    if level & (1 << 1): # use_compressed_image
-        print('Reconfigure use_compressed_image not implemented yet')
+        self.use_compressed_image = config.use_compressed_image
+
+        if self.use_compressed_image:
+            self.image_topic = config.image_topic + '/compressed'
+            self.image_sub = rospy.Subscriber(self.image_topic, CompressedImage, self.callback, queue_size=1)
+        else:
+            self.image_topic = config.image_topic
+            self.image_sub = rospy.Subscriber(self.image_topic, Image, self.callback, queue_size=1)
+        print('Subscribed to ' + self.image_topic)
+
     if level & (1 << 2): # publish_visualization
         self.publish_visualization = config.publish_visualization
     if level & (1 << 3): # publish_detections
