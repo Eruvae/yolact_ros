@@ -17,6 +17,9 @@ from yolact_ros_msgs.msg import Detections
 from yolact_ros_msgs.msg import Detection
 from yolact_ros_msgs.msg import Box
 from yolact_ros_msgs.msg import Mask
+
+from yolact_ros_msgs import mask_utils
+
 from cv_bridge import CvBridge, CvBridgeError
 
 import numpy as np
@@ -48,7 +51,7 @@ class YolactNode:
 
     self.image_pub = rospy.Publisher("~visualization", Image, queue_size=1)
 
-    self.detections_pub = rospy.Publisher("~detections", numpy_msg(Detections), queue_size=1)
+    self.detections_pub = rospy.Publisher("~detections", Detections, queue_size=1)
 
     self.bridge = CvBridge()
 
@@ -68,7 +71,6 @@ class YolactNode:
     self.display_bboxes = True
     self.display_text = True
     self.display_scores = True
-    self.display_lincomb = False
     self.display_fps = False
     self.score_threshold = 0.0
     self.crop_masks = True
@@ -104,7 +106,7 @@ class YolactNode:
         cv2.waitKey(30)
 
   """
-  The functions process_results and prep_display are slightly modified versions
+  The functions postprocess_results and prep_display are slightly modified versions
   of the prep_display function in yolact's eval.py; Copyright (c) 2019 Daniel Bolya
   """
 
@@ -112,7 +114,7 @@ class YolactNode:
       with timer.env('Postprocess'):
           save = cfg.rescore_bbox
           cfg.rescore_bbox = True
-          t = postprocess(dets_out, w, h, visualize_lincomb = self.display_lincomb,
+          t = postprocess(dets_out, w, h, visualize_lincomb = False,
                                           crop_masks        = self.crop_masks,
                                           score_threshold   = self.score_threshold)
           cfg.rescore_bbox = save
@@ -238,17 +240,24 @@ class YolactNode:
     for detnum in range(len(classes)):
       det = Detection()
       det.class_name = cfg.dataset.class_names[classes[detnum]]
-      det.score = scores[detnum]
+      det.score = float(scores[detnum])
       x1, y1, x2, y2 = boxes[detnum]
-      det.box.x1 = x1
-      det.box.y1 = y1
-      det.box.x2 = x2
-      det.box.y2 = y2
+      det.box.x1 = int(x1)
+      det.box.y1 = int(y1)
+      det.box.x2 = int(x2)
+      det.box.y2 = int(y2)
       mask = masks[detnum,y1:y2,x1:x2]
-      det.mask.mask = np.array(mask.flatten().cpu(), dtype=bool)
-      det.mask.height = y2 - y1
-      det.mask.width = x2 - x1
+      det.mask.mask = np.packbits(mask.bool().cpu()).tolist()
+      det.mask.height = int(y2 - y1)
+      det.mask.width = int(x2 - x1)
       dets_msg.detections.append(det)
+
+      #encoding_correct = True
+      #for x in range(det.mask.width):
+      #    for y in range(det.mask.height):
+      #        if bool(masks[detnum,y1+y,x1+x]) != mask_utils.test(det.mask, x, y):
+      #            encoding_correct = False
+      #print('Encoding correct: ' + str(encoding_correct))
 
     dets_msg.header = image_header
     return dets_msg
@@ -300,7 +309,7 @@ class YolactNode:
     self.evalimage(cv_image, data.header)
 
   def reconfigure_callback(self, config, level):
-    if level & ((1 << 0) | (1 << 1)): # image_topic / use_compressed_image
+    if level & (1 << 0): # image_topic / use_compressed_image
         if self.image_sub is not None:
           self.image_sub.unregister()
 
@@ -314,11 +323,11 @@ class YolactNode:
             self.image_sub = rospy.Subscriber(self.image_topic, Image, self.callback, queue_size=1)
         print('Subscribed to ' + self.image_topic)
 
-    if level & (1 << 2): # publish_visualization
+    if level & (1 << 1): # publish_visualization
         self.publish_visualization = config.publish_visualization
-    if level & (1 << 3): # publish_detections
+    if level & (1 << 2): # publish_detections
         self.publish_detections = config.publish_detections
-    if level & (1 << 4): # display_visualization
+    if level & (1 << 3): # display_visualization
         self.display_visualization = config.display_visualization
         if self.display_visualization:
             self.unpause_visualization.set()
@@ -331,23 +340,21 @@ class YolactNode:
         else:
             self.unpause_visualization.clear()
 
-    if level & (1 << 5): # display_masks
+    if level & (1 << 4): # display_masks
         self.display_masks = config.display_masks
-    if level & (1 << 6): # display_bboxes
+    if level & (1 << 5): # display_bboxes
         self.display_bboxes = config.display_bboxes
-    if level & (1 << 7): # display_text
+    if level & (1 << 6): # display_text
         self.display_text = config.display_text
-    if level & (1 << 8): # display_scores
+    if level & (1 << 7): # display_scores
         self.display_scores = config.display_scores
-    if level & (1 << 9): # display_lincomb
-        self.display_lincomb = config.display_lincomb
-    if level & (1 << 10): # display_fps
+    if level & (1 << 8): # display_fps
         self.display_fps = config.display_fps
-    if level & (1 << 11): # score_threshold
+    if level & (1 << 9): # score_threshold
         self.score_threshold = config.score_threshold
-    if level & (1 << 12): # crop_masks
+    if level & (1 << 10): # crop_masks
         self.crop_masks = config.crop_masks
-    if level & (1 << 13): # top_k
+    if level & (1 << 11): # top_k
         self.top_k = config.top_k
 
     return config
