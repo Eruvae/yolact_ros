@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<launch>
+
+<node pkg="yolact_ros" type="yolact_ros" name="yolact_ros" output="screen">
+  <param name="model_path" value="$(find yolact_ros)/scripts/yolact/weights/yolact_base_54_800000.pth" />
+  <param name="image_topic" value="/camera/color/image_raw" />
+  <param name="use_compressed_image" value="False" />
+  <param name="publish_visualization" value="True" />
+  <param name="publish_detecitons" value="True" />
+  <param name="display_visualization" value="False" />
+</node>
+
+</launch>

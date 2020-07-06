@@ -364,7 +364,7 @@ def main(args):
   rospack = rospkg.RosPack()
   yolact_path = rospack.get_path('yolact_ros')
   
-  model_path_str = rospy.get_param('~model_path', os.path.join(yolact_path, "scripts/yolact/weights/yolact_plus_base_54_800000.pth"))
+  model_path_str = rospy.get_param('~model_path', os.path.join(yolact_path, "scripts/yolact/weights/yolact_base_54_800000.pth"))
   model_path = SavePath.from_str(model_path_str)
   set_cfg(model_path.model_name + '_config')
 
@@ -377,7 +377,7 @@ def main(args):
       cudnn.fastest = True
       torch.set_default_tensor_type('torch.cuda.FloatTensor')   
 
-      print('Loading model...', end='')
+      print('Loading model from', model_path_str)
       net = Yolact()
       net.load_weights(model_path_str)
       net.eval()
