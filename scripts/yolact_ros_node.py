@@ -62,7 +62,7 @@ class image_converter:
         """
         Note: If undo_transform=False then im_h and im_w are allowed to be None.
         """
-        dets = Detections()   
+        dets = Detections()
 
         if undo_transform:
             img_numpy = undo_image_transformation(img, w, h)
@@ -70,7 +70,7 @@ class image_converter:
         else:
             img_gpu = img / 255.0
             h, w, _ = img.shape
-        
+
         with timer.env('Postprocess'):
             t = postprocess(dets_out, w, h, visualize_lincomb = False,
                                             crop_masks        = True,
@@ -88,7 +88,7 @@ class image_converter:
             if scores[j] < 0.3:
                 num_dets_to_consider = j
                 break
-        
+
         if num_dets_to_consider == 0:
             # No detections found so just output the original image
             return (img_gpu * 255).byte().cpu().numpy()
@@ -98,7 +98,7 @@ class image_converter:
         def get_color(j, on_gpu=None):
             global color_cache
             color_idx = (classes[j] * 5 if class_color else j * 5) % len(COLORS)
-            
+
             if on_gpu is not None and color_idx in color_cache[on_gpu]:
                 return color_cache[on_gpu][color_idx]
             else:
@@ -116,14 +116,14 @@ class image_converter:
         # I wish I had access to OpenGL or Vulkan but alas, I guess Pytorch tensor operations will have to suffice
         # After this, mask is of size [num_dets, h, w, 1]
         masks = masks[:num_dets_to_consider, :, :, None]
-            
+
         # Prepare the RGB images for each mask given their color (size [num_dets, h, w, 1])
         colors = torch.cat([get_color(j, on_gpu=img_gpu.device.index).view(1, 1, 1, 3) for j in range(num_dets_to_consider)], dim=0)
         masks_color = masks.repeat(1, 1, 1, 3) * colors * mask_alpha
 
         # This is 1 everywhere except for 1-mask_alpha where the mask is
         inv_alph_masks = masks * (-mask_alpha) + 1
-            
+
         # I did the math for this on pen and paper. This whole block should be equivalent to:
         #    for j in range(num_dets_to_consider):
         #        img_gpu = img_gpu * inv_alph_masks[j] + masks_color[j]
@@ -134,11 +134,11 @@ class image_converter:
             masks_color_summand += masks_color_cumul.sum(dim=0)
 
         img_gpu = img_gpu * inv_alph_masks.prod(dim=0) + masks_color_summand
-            
+
         # Then draw the stuff that needs to be done on the cpu
         # Note, make sure this is a uint8 tensor or opencv will not anti alias text for whatever reason
         img_numpy = (img_gpu * 255).byte().cpu().numpy()
-        
+
         for j in reversed(range(num_dets_to_consider)):
             x1, y1, x2, y2 = boxes[j, :]
             color = get_color(j)
@@ -160,7 +160,7 @@ class image_converter:
 
             cv2.rectangle(img_numpy, (x1, y1), (x1 + text_w, y1 - text_h - 4), color, -1)
             cv2.putText(img_numpy, text_str, text_pt, font_face, font_scale, text_color, font_thickness, cv2.LINE_AA)
-               
+
             det = Detection()
             det.box.x1 = x1
             det.box.y1 = y1
@@ -181,7 +181,7 @@ class image_converter:
             det.mask.width = x2 - x1
             det.mask.mask = np.array(mask_rs, dtype=bool)
             dets.detections.append(det)
- 
+
         dets.header.stamp = image_header.stamp
         dets.header.frame_id = image_header.frame_id
         self.detections_pub.publish(dets)
@@ -193,7 +193,7 @@ class image_converter:
     preds = self.net(batch)
 
     img_numpy = self.prep_display(preds, frame, None, None, undo_transform=False, image_header=image_header)
-    
+
     #if save_path is None:
     #    img_numpy = img_numpy[:, :, (2, 1, 0)]
 
@@ -218,7 +218,7 @@ def main(args):
   rospy.init_node('yolact_ros')
   rospack = rospkg.RosPack()
   yolact_path = rospack.get_path('yolact_ros')
-  
+
   model_path_str = yolact_path + "/scripts/yolact/weights/yolact_base_54_800000.pth"
   model_path = SavePath.from_str(model_path_str)
   set_cfg(model_path.model_name + '_config')
@@ -230,7 +230,7 @@ def main(args):
 
       cudnn.benchmark = True
       cudnn.fastest = True
-      torch.set_default_tensor_type('torch.cuda.FloatTensor')   
+      torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
       print('Loading model...', end='')
       net = Yolact()
@@ -243,7 +243,7 @@ def main(args):
       cfg.mask_proto_debug = False
 
   ic = image_converter(net)
-  
+
 
   try:
     rospy.spin()

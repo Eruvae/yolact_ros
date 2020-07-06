@@ -1,10 +1,10 @@
 <launch>
 
-	<arg name="image_topic" default="/camera/rgb/image_raw" />
+	<arg name="image_topic" default="/camera/color/image_raw" />
 
 	<node pkg="yolact_ros" type="yolact_ros_node.py" name="yolact_ros" output="screen">
 
-		<param name="image_topic" value="$(image_topic)" />
+		<param name="image_topic" value="$(arg image_topic)" />
 
 	</node>
 
