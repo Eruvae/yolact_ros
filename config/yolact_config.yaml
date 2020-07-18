@@ -1,0 +1,17 @@
+yolact_ros2_node:
+  ros__parameters:
+    yolact_path: /home/fernando/ros2_ws/src/my_pkgs/yolact_ros2/yolact_ros2/yolact
+    model_path: /home/fernando/ros2_ws/src/my_pkgs/yolact_ros2/yolact_ros2/yolact/weights/yolact_base_54_800000.pth
+    image_topic: /camera/color/image_raw
+    use_compressed_image: False
+    publish_visualization: True
+    publish_detections: True
+    display_visualization: True
+    display_masks: True
+    display_bboxes: True
+    display_text: True
+    display_scores: True
+    display_fps: True
+    score_threshold: 0.0
+    crop_masks: True
+    top_k: 5
