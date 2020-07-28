@@ -44,6 +44,33 @@ coco_cats = {} # Call prep_coco_cats to fill this
 coco_cats_inv = {}
 color_cache = defaultdict(lambda: {})
 
+class SynchronizedObject:
+  def __init__(self):
+    self.obj = None
+    self.co = threading.Condition()
+
+  def put_nowait(self, obj):
+    self.co.acquire()
+    self.obj = obj
+    self.co.notify()
+    self.co.release()
+
+  def get_nowait(self):
+    self.co.acquire()
+    obj = self.obj
+    self.obj = None
+    self.co.release()
+    return obj
+
+  def get(self):
+    self.co.acquire()
+    while self.obj is None:
+      self.co.wait()
+    obj = self.obj
+    self.obj = None
+    self.co.release()
+    return obj
+
 class YolactNode:
 
   def __init__(self, net:Yolact):
@@ -55,7 +82,12 @@ class YolactNode:
 
     self.bridge = CvBridge()
 
-    self.image_vis_queue = Queue(maxsize = 1)
+    self.processing_queue = SynchronizedObject()
+    self.processing_thread = threading.Thread(target=self.processingLoop)
+    self.processing_thread.daemon = True
+    self.processing_thread.start()
+
+    self.image_vis_queue = SynchronizedObject()
     self.visualization_thread = None
     self.unpause_visualization = threading.Event()
 
@@ -97,13 +129,19 @@ class YolactNode:
             print('Unpausing visualization')
             cv2.namedWindow(window_name)
 
-        if self.image_vis_queue.empty():
+        image = self.image_vis_queue.get_nowait()
+        if image is None:
             cv2.waitKey(30)
             continue
 
-        image = self.image_vis_queue.get_nowait()
         cv2.imshow(window_name, image)
         cv2.waitKey(30)
+
+  def processingLoop(self):
+      while True:
+        cv_image, image_header = self.processing_queue.get()
+        self.evalimage(cv_image, image_header)
+
 
   """
   The functions postprocess_results and prep_display are slightly modified versions
@@ -286,7 +324,7 @@ class YolactNode:
         dets = self.generate_detections_msg(classes, scores, boxes, masks, image_header)
         self.detections_pub.publish(dets)
 
-      if self.display_visualization and not self.image_vis_queue.full():
+      if self.display_visualization:
         self.image_vis_queue.put_nowait(image)
 
       if self.publish_visualization:
@@ -306,7 +344,7 @@ class YolactNode:
     except CvBridgeError as e:
       print(e)
 
-    self.evalimage(cv_image, data.header)
+    self.processing_queue.put_nowait((cv_image, data.header))
 
   def reconfigure_callback(self, config, level):
     if level & (1 << 0): # image_topic / use_compressed_image
@@ -317,10 +355,10 @@ class YolactNode:
 
         if self.use_compressed_image:
             self.image_topic = config.image_topic + '/compressed'
-            self.image_sub = rospy.Subscriber(self.image_topic, CompressedImage, self.callback, queue_size=1)
+            self.image_sub = rospy.Subscriber(self.image_topic, CompressedImage, self.callback, queue_size=1, buff_size=2**24)
         else:
             self.image_topic = config.image_topic
-            self.image_sub = rospy.Subscriber(self.image_topic, Image, self.callback, queue_size=1)
+            self.image_sub = rospy.Subscriber(self.image_topic, Image, self.callback, queue_size=1, buff_size=2**24)
         print('Subscribed to ' + self.image_topic)
 
     if level & (1 << 1): # publish_visualization
@@ -369,10 +407,6 @@ def main(args):
   set_cfg(model_path.model_name + '_config')
 
   with torch.no_grad():
-      results_path_str = os.path.join(yolact_path, "scripts/yolact/results")
-      if not os.path.exists(results_path_str):
-          os.makedirs(results_path_str)
-
       cudnn.benchmark = True
       cudnn.fastest = True
       torch.set_default_tensor_type('torch.cuda.FloatTensor')   
