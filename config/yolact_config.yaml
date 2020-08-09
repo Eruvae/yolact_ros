@@ -1,7 +1,7 @@
 yolact_ros2_node:
   ros__parameters:
-    yolact_path: /home/fernando/ros2_ws/src/my_pkgs/yolact_ros2/yolact_ros2/yolact
-    model_path: /home/fernando/ros2_ws/src/my_pkgs/yolact_ros2/yolact_ros2/yolact/weights/yolact_base_54_800000.pth
+    yolact_path: /home/fernando/ros2_ws/src/my_pkgs/yolact_ros/yolact_ros2/yolact
+    model_path: /home/fernando/ros2_ws/src/my_pkgs/yolact_ros/yolact_ros2/yolact/weights/yolact_base_54_800000.pth
     image_topic: /camera/color/image_raw
     use_compressed_image: False
     publish_visualization: True
