@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>yolact_ros2</name>
-  <version>0.1.0</version>
+  <version>1.1.0</version>
   <description>The yolact_ros2 package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
