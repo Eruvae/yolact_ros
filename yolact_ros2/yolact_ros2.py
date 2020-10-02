@@ -68,8 +68,6 @@ class YolactNode(Node):
         publish_ns = self.get_parameter('publish_namespace')._value
         self.image_pub = self.create_publisher(Image, f'{publish_ns}/visualization', 1)
         self.detections_pub = self.create_publisher(Detections, f'{publish_ns}/detections', 1)
-        self.image_pub = self.create_publisher(Image, '/yolact_ros2/visualization', 1)
-        self.detections_pub = self.create_publisher(Detections, '/yolact_ros2/detections', 1)
         self.setParams_()
 
         # Set Reconfigurable parameters Callback:
