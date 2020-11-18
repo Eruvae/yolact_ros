@@ -3,6 +3,9 @@ import rclpy
 from rclpy.node import Node
 from rclpy.exceptions import ParameterNotDeclaredException
 from rclpy.duration import Duration
+from rcl_interfaces.msg import SetParametersResult
+from rcl_interfaces.msg import Parameter, ParameterType
+import rclpy.qos as qos
 
 import sys
 import os
@@ -33,11 +36,14 @@ color_cache = defaultdict(lambda: {})
 class YolactNode(Node):
     def __init__(self, node_name):
         super().__init__(node_name)
+        self.initParams_()
         self.model_path = None
         self.image_sub = None
         self.received_img = None
-        self.image_pub = self.create_publisher(Image, '/yolact_ros2/visualization', 1)
-        self.detections_pub = self.create_publisher(Detections, '/yolact_ros2/detections', 1)
+        self.image_pub = self.create_publisher(Image, '/yolact_ros2/visualization',
+            qos_profile=self.qos_profile)
+        self.detections_pub = self.create_publisher(Detections, '/yolact_ros2/detections',
+            qos_profile=self.qos_profile)
         self.image_vis_queue = Queue(maxsize = 1)
         self.visualization_thread = None
         self.unpause_visualization = threading.Event()
@@ -46,34 +52,50 @@ class YolactNode(Node):
         self.declare_parameters(
         namespace='',
         parameters=[
-            ('yolact_path', None),
-            ('model_path', None),
-            ('image_topic', '/camera/color/image_raw'),
-            ('use_compressed_image', False),
-            ('publish_visualization', True),
-            ('publish_detections', True),
-            ('display_visualization', False),
-            ('display_masks', True),
-            ('display_bboxes', True),
-            ('display_text', True),
-            ('display_scores', True),
-            ('display_fps', False),
-            ('score_threshold', 0.0),
-            ('crop_masks', True),
-            ('top_k', 5)
+            ('yolact_path', self.yolact_path_),
+            ('model_path', self.model_path_),
+            ('image_topic', self.image_topic_),
+            ('use_compressed_image', self.use_compressed_image_),
+            ('publish_visualization', self.publish_visualization_),
+            ('publish_detections', self.publish_detections_),
+            ('display_visualization', self.display_visualization_),
+            ('display_masks', self.display_masks_),
+            ('display_bboxes', self.display_bboxes_),
+            ('display_text', self.display_text_),
+            ('display_scores', self.display_scores_),
+            ('display_fps', self.display_fps_),
+            ('score_threshold', self.score_threshold_),
+            ('crop_masks', self.crop_masks_),
+            ('top_k', self.top_k_)
         ])
-        sys.path.append(self.get_parameter('yolact_path')._value)
+
+        self.setParams_()
+
+        # Set Reconfigurable parameters Callback:
+
+        self.set_parameters_callback(self.parameter_callback_)
+
+        sys.path.append(self.yolact_path_)
+
+        self.loadWeights_()
+
+        self.set_subscription_()
+
+        #for counting fps
+        self.fps = 0
+        self.last_reset_time = self.get_clock().now()
+        self.frame_counter = 0
+
+    def loadWeights_(self):
         from yolact import Yolact
-        #from utils.augmentations import BaseTransform, FastBaseTransform, Resize
         from layers.output_utils import undo_image_transformation
         from data import COCODetection, get_label_map, MEANS
         from data import cfg, set_cfg, set_dataset
-        #from utils import timer
         from utils.functions import SavePath
         try:
-            self.model_path = SavePath.from_str(self.get_parameter('model_path')._value)
+            self.model_path = SavePath.from_str(self.model_path_)
         except ValueError:
-            self.get_logger().error("File [" + self.get_parameter('model_path')._value + "] is not correct format")
+            self.get_logger().error("File [" + self.model_path_ + "] is not correct format")
             sys.exit(1)
 
         set_cfg(self.model_path.model_name + '_config')
@@ -83,12 +105,12 @@ class YolactNode(Node):
             cudnn.fastest = True
             torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
-            self.get_logger().info('Loading model from ' + self.get_parameter('model_path')._value)
+            self.get_logger().info('Loading model from ' + self.model_path_)
             self.net = Yolact()
             try:
-                self.net.load_weights(self.get_parameter('model_path')._value)
+                self.net.load_weights(self.model_path_)
             except FileNotFoundError:
-                self.get_logger().error("File [" + self.get_parameter('model_path')._value + "] doesn't exist")
+                self.get_logger().error("File [" + self.model_path_ + "] doesn't exist")
                 sys.exit(1)
             self.net.eval()
             self.get_logger().info('Done.')
@@ -97,21 +119,109 @@ class YolactNode(Node):
             self.net.detect.use_fast_nms = True
             cfg.mask_proto_debug = False
 
-        self.set_subscription_()
+    def initParams_(self):
+        self.yolact_path_ = None
+        self.model_path_ = None
+        self.image_topic_ = '/camera/color/image_raw'
+        self.use_compressed_image_ = False
+        self.publish_visualization_ = True
+        self.publish_detections_ = True
+        self.display_visualization_ = False
+        self.display_masks_ = True
+        self.display_bboxes_ = True
+        self.display_text_ = True
+        self.display_scores_ = True
+        self.display_fps_ = False
+        self.score_threshold_ = 0.0
+        self.crop_masks_ = True
+        self.top_k_ = True
 
-        #for counting fps
-        self.fps = 0
-        self.last_reset_time = self.get_clock().now()
-        self.frame_counter = 0
+        # Set the QoS Profile:
+
+        self.qos_profile = qos.QoSProfile(depth=1, reliability=qos.QoSReliabilityPolicy.BEST_EFFORT)
+
+    def setParams_(self):
+        self.yolact_path_ = self.get_parameter('yolact_path')._value
+        self.model_path_ = self.get_parameter('model_path')._value
+        self.image_topic_ = self.get_parameter('image_topic')._value
+        self.use_compressed_image_ = self.get_parameter('use_compressed_image')._value
+        self.publish_visualization_ = self.get_parameter('publish_visualization')._value
+        self.publish_detections_ = self.get_parameter('publish_detections')._value
+        self.display_visualization_ = self.get_parameter('display_visualization')._value
+        self.display_masks_ = self.get_parameter('display_masks')._value
+        self.display_bboxes_ = self.get_parameter('display_bboxes')._value
+        self.display_text_ = self.get_parameter('display_text')._value
+        self.display_scores_ = self.get_parameter('display_scores')._value
+        self.display_fps_ = self.get_parameter('display_fps')._value
+        self.score_threshold_ = self.get_parameter('score_threshold')._value
+        self.crop_masks_ = self.get_parameter('crop_masks')._value
+        self.top_k_ = self.get_parameter('top_k')._value
+
+    def parameter_callback_(self, params):
+        model_path_changed = False
+        for param in params:
+            if (param.name == 'yolact_path' and param.type_ == param.Type.STRING):
+                self.yolact_path_ = param.value
+                continue
+            if (param.name == 'model_path' and param.type_ == param.Type.STRING):
+                self.model_path_ = param.value
+                model_path_changed = True
+                continue
+            if (param.name == 'image_topic' and param.type_ == param.Type.STRING):
+                self.image_topic_ = param.value
+                continue
+            if (param.name == 'use_compressed_image' and param.type_ == param.Type.BOOL):
+                self.use_compressed_image_ = param.value
+                continue
+            if (param.name == 'publish_visualization' and param.type_ == param.Type.BOOL):
+                self.publish_visualization_ = param.value
+                continue
+            if (param.name == 'publish_detections' and param.type_ == param.Type.BOOL):
+                self.publish_detections_ = param.value
+                continue
+            if (param.name == 'display_visualization' and param.type_ == param.Type.BOOL):
+                self.display_visualization_ = param.value
+                continue
+            if (param.name == 'display_masks' and param.type_ == param.Type.BOOL):
+                self.display_masks_ = param.value
+                continue
+            if (param.name == 'display_bboxes' and param.type_ == param.Type.BOOL):
+                self.display_bboxes_ = param.value
+                continue
+            if (param.name == 'display_text' and param.type_ == param.Type.BOOL):
+                self.display_text_ = param.value
+                continue
+            if (param.name == 'display_scores' and param.type_ == param.Type.BOOL):
+                self.display_scores_ = param.value
+                continue
+            if (param.name == 'display_fps' and param.type_ == param.Type.BOOL):
+                self.display_fps_ = param.value
+                continue
+            if (param.name == 'score_threshold' and param.type_ == param.Type.DOUBLE):
+                self.score_threshold_ = param.value
+                continue
+            if (param.name == 'crop_masks' and param.type_ == param.Type.BOOL):
+                self.crop_masks_ = param.value
+                continue
+            if (param.name == 'top_k' and param.type_ == param.Type.BOOL):
+                self.top_k_ = param.value
+
+        self.get_logger().warn('****PARAMETERS CHANGED****')
+
+        if (model_path_changed):
+            self.loadWeights_()
+
+        return SetParametersResult(successful=True)
 
     def set_subscription_(self):
-        is_compressed_img = self.get_parameter('use_compressed_image')._value
-        if(self.get_parameter('use_compressed_image')._value):
-            self.create_subscription(CompressedImage, '/compressed', self.img_callback_, 1)
+        if (self.use_compressed_image_):
+            self.create_subscription(CompressedImage, '/compressed', self.img_callback_,
+                qos_profile=self.qos_profile)
         else:
-            self.create_subscription(Image, self.get_parameter('image_topic')._value, self.img_callback_, 1)
+            self.create_subscription(Image, self.image_topic_, self.img_callback_,
+                qos_profile=self.qos_profile)
 
-        if self.get_parameter('display_visualization')._value:
+        if (self.display_visualization_):
             self.unpause_visualization.set()
             if self.visualization_thread is None: # first time visualization
                 self.get_logger().info('Creating thread')
@@ -125,7 +235,7 @@ class YolactNode(Node):
     def img_callback_(self, msg):
 
         try:
-            if(self.get_parameter('use_compressed_image')._value):
+            if (self.use_compressed_image_):
                 np_arr = np.fromstring(msg.data, np.uint8)
                 cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
             else:
@@ -145,7 +255,7 @@ class YolactNode(Node):
             h, w, _ = frame.shape
             classes, scores, boxes, masks = self.postprocess_results_(preds, w, h)
 
-            if self.get_parameter('display_fps')._value:
+            if (self.display_fps_):
                 now = self.get_clock().now()
                 if now - self.last_reset_time > Duration(seconds=1): # reset timer / counter every second
                     self.fps = self.frame_counter
@@ -153,17 +263,17 @@ class YolactNode(Node):
                     self.frame_counter = 0
                 self.frame_counter += 1
 
-            if self.get_parameter('publish_visualization')._value or self.get_parameter('display_visualization')._value:
+            if (self.publish_visualization_ or self.display_visualization_):
                 image = self.prep_display_(classes, scores, boxes, masks, frame, fps_str=str(self.fps))
 
-            if self.get_parameter('publish_detections')._value:
+            if (self.publish_detections_):
                 dets = self.generate_detections_msg_(classes, scores, boxes, masks, image_header)
                 self.detections_pub.publish(dets)
 
-            if self.get_parameter('display_visualization')._value and not self.image_vis_queue.full():
+            if (self.display_visualization_ and not self.image_vis_queue.full()):
                 self.image_vis_queue.put_nowait(image)
 
-            if self.get_parameter('publish_visualization')._value:
+            if (self.publish_visualization_):
                 try:
                     image = self.bridge.cv2_to_imgmsg(image, "bgr8")
                     image.header = image_header
@@ -179,14 +289,14 @@ class YolactNode(Node):
             save = cfg.rescore_bbox
             cfg.rescore_bbox = True
             t = postprocess(dets_out, w, h, visualize_lincomb = False,
-                                            crop_masks        = self.get_parameter('crop_masks')._value,
-                                            score_threshold   = self.get_parameter('score_threshold')._value)
+                                            crop_masks        = self.crop_masks_,
+                                            score_threshold   = self.score_threshold_)
             cfg.rescore_bbox = save
 
         with timer.env('Copy'):
-            idx = t[1].argsort(0, descending=True)[:self.get_parameter('top_k')._value]
+            idx = t[1].argsort(0, descending=True)[:self.top_k_]
 
-            if cfg.eval_mask_branch:
+            if (cfg.eval_mask_branch):
                 # Masks are drawn on the GPU, so don't copy
                 masks = t[3][idx]
             classes, scores, boxes = [x[idx].cpu().numpy() for x in t[:3]]
@@ -197,9 +307,9 @@ class YolactNode(Node):
         from data import cfg, COLORS
         img_gpu = img / 255.0
 
-        num_dets_to_consider = min(self.get_parameter('top_k')._value, classes.shape[0])
+        num_dets_to_consider = min(self.top_k_, classes.shape[0])
         for j in range(num_dets_to_consider):
-            if scores[j] < self.get_parameter('score_threshold')._value:
+            if (scores[j] < self.score_threshold_):
                 num_dets_to_consider = j
                 break
 
@@ -223,7 +333,7 @@ class YolactNode(Node):
         # First, draw the masks on the GPU where we can do it really fast
         # Beware: very fast but possibly unintelligible mask-drawing code ahead
         # I wish I had access to OpenGL or Vulkan but alas, I guess Pytorch tensor operations will have to suffice
-        if self.get_parameter('display_masks')._value and cfg.eval_mask_branch and num_dets_to_consider > 0:
+        if (self.display_masks_ and cfg.eval_mask_branch and num_dets_to_consider > 0):
             # After this, mask is of size [num_dets, h, w, 1]
             masks = masks[:num_dets_to_consider, :, :, None]
 
@@ -238,14 +348,14 @@ class YolactNode(Node):
             #    for j in range(num_dets_to_consider):
             #        img_gpu = img_gpu * inv_alph_masks[j] + masks_color[j]
             masks_color_summand = masks_color[0]
-            if num_dets_to_consider > 1:
+            if (num_dets_to_consider > 1):
                 inv_alph_cumul = inv_alph_masks[:(num_dets_to_consider-1)].cumprod(dim=0)
                 masks_color_cumul = masks_color[1:] * inv_alph_cumul
                 masks_color_summand += masks_color_cumul.sum(dim=0)
 
             img_gpu = img_gpu * inv_alph_masks.prod(dim=0) + masks_color_summand
 
-        if self.get_parameter('display_fps')._value:
+        if (self.display_fps_):
             # Draw the box for the fps on the GPU
             font_face = cv2.FONT_HERSHEY_DUPLEX
             font_scale = 0.6
@@ -260,7 +370,7 @@ class YolactNode(Node):
         # Note, make sure this is a uint8 tensor or opencv will not anti alias text for whatever reason
         img_numpy = (img_gpu * 255).byte().cpu().numpy()
 
-        if self.get_parameter('display_fps')._value:
+        if (self.display_fps_):
             # Draw the text on the CPU
             text_pt = (4, text_h + 2)
             text_color = [255, 255, 255]
@@ -270,18 +380,18 @@ class YolactNode(Node):
         if num_dets_to_consider == 0:
             return img_numpy
 
-        if self.get_parameter('display_text')._value or self.get_parameter('display_bboxes')._value:
+        if (self.display_text_ or self.display_bboxes_):
             for j in reversed(range(num_dets_to_consider)):
                 x1, y1, x2, y2 = boxes[j, :]
                 color = get_color(j)
                 score = scores[j]
 
-                if self.get_parameter('display_bboxes')._value:
+                if (self.display_bboxes_):
                     cv2.rectangle(img_numpy, (x1, y1), (x2, y2), color, 1)
 
-                if self.get_parameter('display_text')._value:
+                if (self.display_text_):
                     _class = cfg.dataset.class_names[classes[j]]
-                    text_str = '%s: %.2f' % (_class, score) if self.get_parameter('display_scores')._value else _class
+                    text_str = '%s: %.2f' % (_class, score) if self.display_scores_ else _class
 
                     font_face = cv2.FONT_HERSHEY_DUPLEX
                     font_scale = 0.6
@@ -325,7 +435,7 @@ class YolactNode(Node):
         cv2.namedWindow(window_name)
         self.get_logger().info('Window successfully created')
         while True:
-          if not self.unpause_visualization.is_set():
+          if (not self.unpause_visualization.is_set()):
               self.get_logger().info('Pausing visualization')
               cv2.destroyWindow(window_name)
               cv2.waitKey(30)
@@ -333,7 +443,7 @@ class YolactNode(Node):
               self.get_logger().info('Unpausing visualization')
               cv2.namedWindow(window_name)
 
-          if self.image_vis_queue.empty():
+          if (self.image_vis_queue.empty()):
               cv2.waitKey(30)
               continue
 
@@ -343,7 +453,9 @@ class YolactNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    #Create node
+
+    # Create node:
+
     yolact_node = YolactNode('yolact_ros2_node')
 
     try:

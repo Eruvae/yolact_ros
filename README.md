@@ -78,7 +78,9 @@ The following parameters are available:
 
 If everything was okey, you should see something like this:
 
-![Image](https://github.com/Eruvae/yolact_ros/tree/ROS2/docs/image_demo_yolact_ros2.png)
+<p align="center">
+  <img width="750" height="460" src="https://github.com/Eruvae/yolact_ros/tree/ROS2/docs/image_demo_yolact_ros2.png">
+</p>
 
 ## Nodes
 
@@ -135,4 +137,6 @@ It takes as input the 2d image provided by camera driver and calculate 2d boundi
 
 * **/yolact_ros2/visualization:** In this topic is published messages of standard message type *sensor_msgs/Image* that you can visualize in *rviz*. It is useful for visual debugging:
 
-![Image](https://github.com/Eruvae/yolact_ros/tree/ROS2/docs/image2_demo_yolact_ros2.png)
+<p align="center">
+  <img width="750" height="460" src="https://github.com/Eruvae/yolact_ros/tree/ROS2/docs/image2_demo_yolact_ros2.png">
+</p>
