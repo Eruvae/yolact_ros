@@ -44,6 +44,7 @@ class YolactNode(Node):
             qos_profile=self.qos_profile)
         self.detections_pub = self.create_publisher(Detections, '/yolact_ros2/detections',
             qos_profile=self.qos_profile)
+
         self.image_vis_queue = Queue(maxsize = 1)
         self.visualization_thread = None
         self.unpause_visualization = threading.Event()
@@ -66,9 +67,12 @@ class YolactNode(Node):
             ('display_fps', self.display_fps_),
             ('score_threshold', self.score_threshold_),
             ('crop_masks', self.crop_masks_),
-            ('top_k', self.top_k_)
+            ('top_k', self.top_k_),
+            ('publish_namespace', '/yolact_ros2')
         ])
-
+        publish_ns = self.get_parameter('publish_namespace')._value
+        self.image_pub = self.create_publisher(Image, f'{publish_ns}/visualization', 1)
+        self.detections_pub = self.create_publisher(Detections, f'{publish_ns}/detections', 1)
         self.setParams_()
 
         # Set Reconfigurable parameters Callback:
