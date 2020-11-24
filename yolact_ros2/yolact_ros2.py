@@ -5,6 +5,7 @@ from rclpy.exceptions import ParameterNotDeclaredException
 from rclpy.duration import Duration
 from rcl_interfaces.msg import SetParametersResult
 from rcl_interfaces.msg import Parameter, ParameterType
+import rclpy.qos as qos
 
 import sys
 import os
@@ -39,7 +40,6 @@ class YolactNode(Node):
         self.model_path = None
         self.image_sub = None
         self.received_img = None
-        
         self.image_vis_queue = Queue(maxsize = 1)
         self.visualization_thread = None
         self.unpause_visualization = threading.Event()
@@ -66,8 +66,10 @@ class YolactNode(Node):
             ('publish_namespace', '/yolact_ros2')
         ])
         publish_ns = self.get_parameter('publish_namespace')._value
-        self.image_pub = self.create_publisher(Image, f'{publish_ns}/visualization', 1)
-        self.detections_pub = self.create_publisher(Detections, f'{publish_ns}/detections', 1)
+        self.image_pub = self.create_publisher(Image, f'{publish_ns}/visualization',
+            qos_profile=self.qos_profile)
+        self.detections_pub = self.create_publisher(Detections, f'{publish_ns}/detections',
+            qos_profile=self.qos_profile)
         self.setParams_()
 
         # Set Reconfigurable parameters Callback:
@@ -134,6 +136,10 @@ class YolactNode(Node):
         self.score_threshold_ = 0.0
         self.crop_masks_ = True
         self.top_k_ = True
+
+        # Set the QoS Profile:
+
+        self.qos_profile = qos.QoSProfile(depth=1, reliability=qos.QoSReliabilityPolicy.BEST_EFFORT)
 
     def setParams_(self):
         self.yolact_path_ = self.get_parameter('yolact_path')._value
@@ -210,9 +216,11 @@ class YolactNode(Node):
 
     def set_subscription_(self):
         if (self.use_compressed_image_):
-            self.create_subscription(CompressedImage, '/compressed', self.img_callback_, 1)
+            self.create_subscription(CompressedImage, '/compressed', self.img_callback_,
+                qos_profile=self.qos_profile)
         else:
-            self.create_subscription(Image, self.image_topic_, self.img_callback_, 1)
+            self.create_subscription(Image, self.image_topic_, self.img_callback_,
+                qos_profile=self.qos_profile)
 
         if (self.display_visualization_):
             self.unpause_visualization.set()
