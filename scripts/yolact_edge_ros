@@ -39,6 +39,8 @@ from rospy.numpy_msg import numpy_msg
 from dynamic_reconfigure.server import Server as ReconfigureServer
 from yolact_ros.cfg import YolactConfig
 
+from utils.tensorrt import convert_to_tensorrt
+
 iou_thresholds = [x / 100 for x in range(50, 100, 5)]
 coco_cats = {} # Call prep_coco_cats to fill this
 coco_cats_inv = {}
@@ -398,13 +400,33 @@ class YolactNode:
 
     return config
 
+class YolactInitParams:
+    def __init__(self):
+        self.trained_model = None
+        self.disable_tensorrt = False
+        self.use_fp16_tensorrt = False
+        self.use_tensorrt_safe_mode=False
+        self.calib_images = None
+        self.cuda = True
+        self.trt_batch_size = 1
+
+
 def main(args):
   rospy.init_node('yolact_ros')
   rospack = rospkg.RosPack()
   yolact_path = rospack.get_path('yolact_ros')
+
+  params = YolactInitParams()
   
-  model_path_str = rospy.get_param('~model_path', os.path.join(yolact_path, "scripts/yolact_edge/weights/yolact_edge_vid_847_50000.pth"))
-  model_path = SavePath.from_str(model_path_str)
+  params.trained_model = rospy.get_param('~model_path', os.path.join(yolact_path, "scripts/yolact_edge/weights/yolact_edge_vid_847_50000.pth"))
+  params.disable_tensorrt = rospy.get_param('~disable_tensorrt', False)
+  params.use_fp16_tensorrt = rospy.get_param('~use_fp16_tensorrt', False)
+  params.use_tensorrt_safe_mode = rospy.get_param('~use_tensorrt_safe_mode', False)
+  params.calib_images = rospy.get_param('~calib_images', os.path.join(yolact_path, "scripts/yolact_edge/data/coco/calib_images"))
+  params.cuda = rospy.get_param('~cuda', True)
+  params.trt_batch_size = rospy.get_param('~trt_batch_size', 1)
+
+  model_path = SavePath.from_str(params.trained_model)
   set_cfg(model_path.model_name + '_config')
 
   with torch.no_grad():
@@ -412,12 +434,13 @@ def main(args):
       cudnn.fastest = True
       torch.set_default_tensor_type('torch.cuda.FloatTensor')   
 
-      print('Loading model from', model_path_str)
+      print('Loading model from', params.trained_model)
       net = Yolact()
-      net.load_weights(model_path_str)
+      net.load_weights(params.trained_model)
       net.eval()
       print('Done.')
 
+      convert_to_tensorrt(net, cfg, params, transform=BaseTransform())
       net = net.cuda()
       net.detect.use_fast_nms = True
       cfg.mask_proto_debug = False
