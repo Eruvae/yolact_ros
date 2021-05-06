@@ -1,3 +1,6 @@
 [submodule "scripts/yolact"]
 	path = scripts/yolact
 	url = https://github.com/dbolya/yolact.git
+[submodule "scripts/yolact_edge"]
+	path = scripts/yolact_edge
+	url = https://github.com/Eruvae/yolact_edge.git
