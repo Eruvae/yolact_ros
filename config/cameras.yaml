@@ -1,0 +1,35 @@
+camera_node_right:
+  ros__parameters:
+    base_frame_id: camera_right_bottom_screw_frame
+    #serial_no: '923322072442'
+    align_depth: true
+    allow_no_texture_points: true
+    color_qos: SENSOR_DATA
+    confidence_qos: SENSOR_DATA
+    depth_qos: SENSOR_DATA
+    device_type: d4.
+    enable_color: true
+    enable_confidence: true
+    enable_depth: true
+    enable_infra1: false
+    enable_infra2: false
+    enable_pointcloud: true
+    enable_sync: true
+    fisheye_qos: SENSOR_DATA
+    infra_qos: SENSOR_DATA
+    infra_rgb: false
+    initial_reset: true
+    colorize: true
+    ordered_pc: true
+    output: screen
+    pointcloud_texture_stream: RS2_STREAM_COLOR
+    depth_frame_id: camera_left_depth_frame
+    depth_optical_frame_id: camera_left_depth_optical_frame
+    color_frame_id: camera_left_color_frame
+    color_optical_frame_id: camera_left_color_optical_frame
+    aligned_depth_to_color_frame_id: camera_left_aligned_depth_to_color_frame
+    bottom_screw_frame_id: camera_left_bottom_screw_frame
+    infra1_frame_id: camera_left_infra1_frame
+    infra1_optical_frame_id: camera_left_infra1_optical_frame
+    infra2_frame_id: camera_left_infra2_frame
+    infra2_optical_frame_id: camera_left_infra2_optical_frame

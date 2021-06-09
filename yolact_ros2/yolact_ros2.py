@@ -88,7 +88,7 @@ class YolactNode(Node):
         self.frame_counter = 0
 
     def loadWeights_(self):
-        from yolact import Yolact
+        from yolact import yolact
         from layers.output_utils import undo_image_transformation
         from data import COCODetection, get_label_map, MEANS
         from data import cfg, set_cfg, set_dataset
@@ -107,7 +107,7 @@ class YolactNode(Node):
             torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
             self.get_logger().info('Loading model from ' + self.model_path_)
-            self.net = Yolact()
+            self.net = yolact.Yolact()
             try:
                 self.net.load_weights(self.model_path_)
             except FileNotFoundError:
@@ -216,25 +216,27 @@ class YolactNode(Node):
 
     def set_subscription_(self):
         if (self.use_compressed_image_):
+            self.get_logger().info(f"Subscribing to compressed images in topic '/compressed'")
             self.create_subscription(CompressedImage, '/compressed', self.img_callback_,
                 qos_profile=self.qos_profile)
         else:
+            self.get_logger().info(f"Subscribing to topic '{self.image_topic_}' for RGB images messages")
             self.create_subscription(Image, self.image_topic_, self.img_callback_,
                 qos_profile=self.qos_profile)
 
         if (self.display_visualization_):
             self.unpause_visualization.set()
             if self.visualization_thread is None: # first time visualization
-                self.get_logger().info('Creating thread')
+                self.get_logger().info('Creating visualization thread to display inference')
                 self.visualization_thread = threading.Thread(target=self.visualizationLoop_)
                 self.visualization_thread.daemon = True
                 self.visualization_thread.start()
-                self.get_logger().info('Thread was started')
+                self.get_logger().info('Visualization thread started.')
         else:
             self.unpause_visualization.clear()
 
     def img_callback_(self, msg):
-
+        self.get_logger().info("Inferece: Image received.")
         try:
             if (self.use_compressed_image_):
                 np_arr = np.fromstring(msg.data, np.uint8)
@@ -247,6 +249,7 @@ class YolactNode(Node):
         self.evalimage_(cv_image, msg.header)
 
     def evalimage_(self, cv_image, image_header):
+        self.get_logger().info("Inference: Evaluating image.")
         from utils.augmentations import BaseTransform, FastBaseTransform, Resize
         with torch.no_grad():
             frame = torch.from_numpy(cv_image).cuda().float()
