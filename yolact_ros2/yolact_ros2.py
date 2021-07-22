@@ -48,21 +48,21 @@ class YolactNode(Node):
         self.declare_parameters(
         namespace='',
         parameters=[
-            ('yolact_path', self.yolact_path_),
-            ('model_path', self.model_path_),
-            ('image_topic', self.image_topic_),
-            ('use_compressed_image', self.use_compressed_image_),
-            ('publish_visualization', self.publish_visualization_),
-            ('publish_detections', self.publish_detections_),
-            ('display_visualization', self.display_visualization_),
-            ('display_masks', self.display_masks_),
-            ('display_bboxes', self.display_bboxes_),
-            ('display_text', self.display_text_),
-            ('display_scores', self.display_scores_),
-            ('display_fps', self.display_fps_),
-            ('score_threshold', self.score_threshold_),
-            ('crop_masks', self.crop_masks_),
-            ('top_k', self.top_k_),
+            ('yolact_path', ""),
+            ('model_path', ""),
+            ('image_topic', "/camera/color/image_raw"),
+            ('use_compressed_image', False),
+            ('publish_visualization', True),
+            ('publish_detections', True),
+            ('display_visualization', True),
+            ('display_masks', True),
+            ('display_bboxes', True),
+            ('display_text', True),
+            ('display_scores', True),
+            ('display_fps', True),
+            ('score_threshold', 0.0),
+            ('crop_masks', True),
+            ('top_k', 5),
             ('publish_namespace', '/yolact_ros2')
         ])
         publish_ns = self.get_parameter('publish_namespace')._value
@@ -73,8 +73,7 @@ class YolactNode(Node):
         self.setParams_()
 
         # Set Reconfigurable parameters Callback:
-
-        self.set_parameters_callback(self.parameter_callback_)
+        self.add_on_set_parameters_callback(self.parameter_callback_)
 
         sys.path.append(self.yolact_path_)
 
