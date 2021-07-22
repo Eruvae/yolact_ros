@@ -20,8 +20,8 @@ def generate_launch_description():
 
     yolact_ros_node = Node(
     package='yolact_ros2',
-    node_executable='yolact_ros2_node',
-    node_name='yolact_ros2_node',
+    executable='yolact_ros2_node',
+    name='yolact_ros2_node',
     output='screen',
     parameters=[config_file]
     )
