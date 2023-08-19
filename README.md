@@ -2,8 +2,6 @@
 
 **ROS2** wrapper for Yolact.
 
-**WORK IN PROGRESS**
-
 ## yolact_ros
 
 * **Maintainer status:** maintained
@@ -24,11 +22,11 @@
 
 ## Overview
 
-*yolact_ros2* is a **ROS2 Eloquent** wrapper for neural network [yolact](https://github.com/dbolya/yolact)
+*yolact_ros2* is a **ROS2** wrapper for neural network [yolact](https://github.com/dbolya/yolact)
 
 ### Previous Steps
 
-The first we have to know is that *yolact_ros2* package have dependencies as follow:
+The first thing we have to know is that *yolact_ros2* package have ROS2 dependencies as follow:
 
 * rclpy
 * std_msgs
@@ -41,6 +39,8 @@ The first we have to know is that *yolact_ros2* package have dependencies as fol
 ### Installation
 
 You must to clone *yolact_ros2* into *src* folder located in your ROS2 workspace. Later, you have to compile it typing ``colcon build``.
+
+Using the *requirements.txt* file, the python dependencies can be installed by typing ``pip3 install -r requirements.txt``.
 
 ### How it Works
 
