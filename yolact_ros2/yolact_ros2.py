@@ -74,7 +74,7 @@ class YolactNode(Node):
 
         # Set Reconfigurable parameters Callback:
 
-        self.set_parameters_callback(self.parameter_callback_)
+        self.add_on_set_parameters_callback(self.parameter_callback_)
 
         sys.path.append(self.yolact_path_)
 
@@ -121,8 +121,8 @@ class YolactNode(Node):
             cfg.mask_proto_debug = False
 
     def initParams_(self):
-        self.yolact_path_ = None
-        self.model_path_ = None
+        self.yolact_path_ = ''
+        self.model_path_ = ''
         self.image_topic_ = '/camera/color/image_raw'
         self.use_compressed_image_ = False
         self.publish_visualization_ = True
@@ -135,7 +135,7 @@ class YolactNode(Node):
         self.display_fps_ = False
         self.score_threshold_ = 0.0
         self.crop_masks_ = True
-        self.top_k_ = True
+        self.top_k_ = 5
 
         # Set the QoS Profile:
 
@@ -204,7 +204,7 @@ class YolactNode(Node):
             if (param.name == 'crop_masks' and param.type_ == param.Type.BOOL):
                 self.crop_masks_ = param.value
                 continue
-            if (param.name == 'top_k' and param.type_ == param.Type.BOOL):
+            if (param.name == 'top_k' and param.type_ == param.Type.INTEGER):
                 self.top_k_ = param.value
 
         self.get_logger().warn('****PARAMETERS CHANGED****')
